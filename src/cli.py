@@ -98,6 +98,12 @@ def predict(
         "-d",
         help="Filter results by district (e.g. 'Kolkata', 'Darjeeling', 'Burdwan', 'Nadia')",
     ),
+    branch_type: Optional[str] = typer.Option(
+        None,
+        "--branch-type",
+        "-b",
+        help="Filter by branch classification ('Clinical' or 'Non-Clinical')",
+    ),
     sort_by: str = typer.Option(
         "cutoff",
         "--sort-by",
@@ -162,6 +168,12 @@ def predict(
         if dist_input.strip():
             district = dist_input.strip()
 
+        bt_choice = typer.prompt("👉 Branch Type (1: All, 2: Clinical Only, 3: Non-Clinical Only)", default="1")
+        if bt_choice == "2":
+            branch_type = "Clinical"
+        elif bt_choice == "3":
+            branch_type = "Non-Clinical"
+
     # Convert percentage to decimal if > 1.0
     conf_decimal = min_confidence / 100.0 if min_confidence > 1.0 else min_confidence
 
@@ -175,6 +187,7 @@ def predict(
                 round_no=round_no,
                 min_confidence=conf_decimal,
                 district=district,
+                branch_type=branch_type,
                 sort_by=sort_by,
                 top_n=None,  # Filter before truncating
             )
@@ -202,6 +215,8 @@ def predict(
     ]
     if district:
         header_parts.append(f"[bold]District:[/bold] [yellow]{district}[/yellow]")
+    if branch_type:
+        header_parts.append(f"[bold]Type:[/bold] [green]{branch_type}[/green]")
     header_parts.append(f"[bold]Sort:[/bold] [cyan]{sort_by.capitalize()}[/cyan]")
 
     header_text = "   ".join(header_parts)
@@ -214,7 +229,7 @@ def predict(
                 "[dim]💡 Suggestions:\n"
                 "  • Try lowering the threshold: [cyan]--min-confidence 30[/cyan]\n"
                 "  • Check a later round: [cyan]--round 3[/cyan]\n"
-                "  • Remove district or course filters[/dim]",
+                "  • Remove district, course, or branch filters[/dim]",
                 title="Result",
                 border_style="yellow",
             )
@@ -229,6 +244,7 @@ def predict(
             row["INSTITUTE"],
             row["DISTRICT"],
             row["COURSE"],
+            row["BRANCH_TYPE"],
             f"{row['CONFIDENCE (%)']:.1f}%",
             row["STATUS"],
             f"{row['EST_CUTOFF (Median)']:,}",
@@ -240,6 +256,7 @@ def predict(
         "Institute",
         "District",
         "Course / Speciality",
+        "Branch Type",
         "Confidence",
         "Safety Status",
         "Est. Cutoff",
@@ -251,7 +268,7 @@ def predict(
         table_data,
         headers=headers,
         tablefmt="rounded_outline",
-        colalign=("center", "left", "left", "left", "right", "left", "right", "right"),
+        colalign=("center", "left", "left", "left", "center", "right", "left", "right", "right"),
     )
     console.print(rendered_table)
 

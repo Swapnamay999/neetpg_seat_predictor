@@ -46,6 +46,30 @@ CATEGORY_ALIASES = {
 }
 
 
+NON_CLINICAL_KEYWORDS = [
+    "ANATOMY",
+    "PHYSIOLOGY",
+    "BIOCHEMISTRY",
+    "PATHOLOGY",
+    "MICROBIOLOGY",
+    "PHARMACOLOGY",
+    "FORENSIC",
+    "COMMUNITY MEDICINE",
+    "PREVENTIVE AND SOCIAL MEDICINE",
+    "EPIDEMIOLOGY",
+    "TRANSFUSION MEDICINE",
+]
+
+
+def classify_course(course: str) -> str:
+    """Categorizes course into 'Clinical' or 'Non-Clinical'."""
+    c_upper = str(course).upper()
+    for kw in NON_CLINICAL_KEYWORDS:
+        if kw in c_upper:
+            return "Non-Clinical"
+    return "Clinical"
+
+
 def normalize_quota(quota_str: str) -> list[str]:
     cleaned = quota_str.strip().lower()
     return QUOTA_ALIASES.get(cleaned, [quota_str])
@@ -122,6 +146,9 @@ class SeatPredictor:
         round_no: int = 1,
         min_confidence: float = 0.50,
         district: str | None = None,
+        branch_type: str | None = None,
+        institute: str | None = None,
+        course: str | None = None,
         sort_by: str = "cutoff",
         top_n: int | None = None,
     ) -> pd.DataFrame:
@@ -135,6 +162,9 @@ class SeatPredictor:
             round_no: Counselling Round (1, 2, or 3).
             min_confidence: Minimum probability threshold (e.g. 0.50 for 50%).
             district: Optional district filter (e.g. 'Kolkata', 'Darjeeling', 'Burdwan').
+            branch_type: Optional 'Clinical' or 'Non-Clinical' filter.
+            institute: Optional institute substring filter.
+            course: Optional course substring filter.
             sort_by: 'cutoff' (ranks most competitive seats first) or 'confidence' (safest first).
             top_n: Limit number of returned rows.
         """
@@ -188,6 +218,7 @@ class SeatPredictor:
             "INSTITUTE": matching_seats["INSTITUTE"].values,
             "DISTRICT": [get_district(inst) for inst in matching_seats["INSTITUTE"].values],
             "COURSE": matching_seats["COURSE"].values,
+            "BRANCH_TYPE": [classify_course(c) for c in matching_seats["COURSE"].values],
             "CONFIDENCE (%)": confidences,
             "STATUS": [get_safety_badge(c) for c in confidences],
             "EST_CUTOFF (Median)": np.round(pred_q50).astype(int),
@@ -201,6 +232,26 @@ class SeatPredictor:
         if district and not results_df.empty:
             results_df = results_df[
                 results_df["DISTRICT"].str.contains(district.strip(), case=False, na=False)
+            ]
+
+        # Apply branch_type filter (Clinical / Non-Clinical)
+        if branch_type and not results_df.empty:
+            clean_bt = branch_type.strip().lower()
+            if "non" in clean_bt:
+                results_df = results_df[results_df["BRANCH_TYPE"] == "Non-Clinical"]
+            elif "clin" in clean_bt:
+                results_df = results_df[results_df["BRANCH_TYPE"] == "Clinical"]
+
+        # Apply institute filter if requested
+        if institute and not results_df.empty:
+            results_df = results_df[
+                results_df["INSTITUTE"].str.contains(institute.strip(), case=False, na=False)
+            ]
+
+        # Apply course filter if requested
+        if course and not results_df.empty:
+            results_df = results_df[
+                results_df["COURSE"].str.contains(course.strip(), case=False, na=False)
             ]
 
         # Drop duplicate college+branch offerings, keeping highest confidence

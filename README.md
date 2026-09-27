@@ -17,8 +17,10 @@ An intelligent, machine-learning-powered seat allotment prediction engine for **
   - 🟡 **Realistic / Target ($50\% - 79\%$)**: Within expected median cutoff bounds.
   - 🟠 **Borderline / Competitive ($25\% - 49\%$)**: Near upper-tail historical cutoffs.
   - 🔴 **Dream / Reach ($< 25\%$)**: Unlikely based on past patterns.
+- **Branch Classification**: One-click toggle between **Clinical** (e.g. Medicine, Surgery, Pediatrics, Radio-Diagnosis) and **Non-Clinical / Para-Clinical** (e.g. Pathology, Pharmacology, Microbiology, Anatomy).
+- **Column-Level Filters**: Instant multi-select and search for specific **Institute Names**, **Specialities / Subjects**, and **Branch Types** directly above the recommendation table.
 - **District-Specific Filtering**: Comprehensive mapping of all **64 medical colleges and hospitals** across West Bengal's **21 administrative districts**.
-- **Interactive Web App**: Modern Streamlit interface with Plotly analytics (safety distribution donut charts, cutoff vs AIR comparisons, district availability bars).
+- **Interactive Web App**: Modern Streamlit interface with Plotly analytics (safety distribution donut charts, clinical vs non-clinical charts, cutoff vs AIR comparisons, district availability bars).
 - **Rich Terminal CLI**: Interactive CLI powered by **Typer**, **Tabulate**, and **Rich**.
 - **High Predictive Power**: Mean 5-Fold Cross-Validation **$R^2 = 0.8399$** (Adjusted $R^2 = 0.8389$) and Out-of-Time Temporal **$R^2 = 0.7389$** on unseen future counselling rounds.
 

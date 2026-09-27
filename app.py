@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from config import MODEL_PATH
-from src.predict import SeatPredictor
+from src.predict import SeatPredictor, classify_course
 from src.districts import ALL_DISTRICTS, get_district
 from src.cli import VALID_CATEGORIES, VALID_QUOTAS
 
@@ -121,6 +121,14 @@ with st.sidebar:
         help="Cutoffs typically expand in later rounds as seats shuffle.",
     )
 
+    branch_type_selection = st.radio(
+        "Branch Classification",
+        options=["All Specialities", "Clinical Only", "Non-Clinical Only"],
+        index=0,
+        horizontal=True,
+        help="Filter between patient-care clinical branches and non/para-clinical branches.",
+    )
+
     st.markdown("---")
     st.subheader("🔍 Filters & Sorting")
 
@@ -172,6 +180,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Map branch classification parameter
+branch_param = None
+if "Clinical Only" in branch_type_selection:
+    branch_param = "Clinical"
+elif "Non-Clinical" in branch_type_selection:
+    branch_param = "Non-Clinical"
+
 # Run Inference
 sort_by_param = "cutoff" if "Competitive" in sort_order else "confidence"
 results_df = predictor.predict(
@@ -180,6 +195,7 @@ results_df = predictor.predict(
     allotted_quota=quota_input,
     round_no=round_input,
     min_confidence=confidence_threshold / 100.0,
+    branch_type=branch_param,
     sort_by=sort_by_param,
     top_n=None,
 )
@@ -219,12 +235,55 @@ with tab1:
             "- Removing any restrictive district or course filters."
         )
     else:
-        st.caption(f"Displaying top {min(top_limit, len(results_df))} of {len(results_df)} matching seat combinations.")
+        # Instant Column-Level Quick Filters
+        with st.container(border=True):
+            st.markdown("##### 🔎 Column-Level Quick Filters")
+            col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 1])
 
-        display_df = results_df.head(top_limit)[[
+            avail_colleges = sorted(results_df["INSTITUTE"].unique())
+            avail_courses = sorted(results_df["COURSE"].unique())
+            avail_branch_types = ["All Types"] + sorted(results_df["BRANCH_TYPE"].unique().tolist())
+
+            with col_f1:
+                selected_colleges = st.multiselect(
+                    "Filter by Institute Name",
+                    options=avail_colleges,
+                    default=[],
+                    placeholder="All Colleges in View",
+                    help="Filter rows by specific medical colleges.",
+                )
+            with col_f2:
+                selected_subjects = st.multiselect(
+                    "Filter by Subject / Course",
+                    options=avail_courses,
+                    default=[],
+                    placeholder="All Subjects in View",
+                    help="Filter rows by specific subjects.",
+                )
+            with col_f3:
+                selected_bt = st.selectbox(
+                    "Branch Classification",
+                    options=avail_branch_types,
+                    index=0,
+                    help="Toggle between Clinical and Non-Clinical specialities.",
+                )
+
+        # Apply Column-Level Filters
+        filtered_view = results_df.copy()
+        if selected_colleges:
+            filtered_view = filtered_view[filtered_view["INSTITUTE"].isin(selected_colleges)]
+        if selected_subjects:
+            filtered_view = filtered_view[filtered_view["COURSE"].isin(selected_subjects)]
+        if selected_bt != "All Types":
+            filtered_view = filtered_view[filtered_view["BRANCH_TYPE"] == selected_bt]
+
+        st.caption(f"Displaying top {min(top_limit, len(filtered_view))} of {len(filtered_view)} filtered seats.")
+
+        display_df = filtered_view.head(top_limit)[[
             "INSTITUTE",
             "DISTRICT",
             "COURSE",
+            "BRANCH_TYPE",
             "CONFIDENCE (%)",
             "STATUS",
             "EST_CUTOFF (Median)",
@@ -237,6 +296,7 @@ with tab1:
             "Medical Institute",
             "District",
             "Speciality / Course",
+            "Branch Type",
             "Confidence",
             "Safety Tier",
             "Median Cutoff",
@@ -258,9 +318,9 @@ with tab1:
         )
 
         # Download CSV Button
-        csv_data = results_df.to_csv(index=False).encode("utf-8")
+        csv_data = filtered_view.to_csv(index=False).encode("utf-8")
         st.download_button(
-            label="📥 Download Complete Prediction List as CSV",
+            label="📥 Download Filtered Prediction List as CSV",
             data=csv_data,
             file_name=f"neetpg_wb_predictions_air_{air_input}_round_{round_input}.csv",
             mime="text/csv",
@@ -273,7 +333,7 @@ with tab2:
     if results_df.empty:
         st.info("No data available to plot. Adjust your filters to generate recommendations.")
     else:
-        chart_col1, chart_col2 = st.columns(2)
+        chart_col1, chart_col2, chart_col3 = st.columns(3)
 
         # Chart 1: Safety Tier Distribution Donut Chart
         with chart_col1:
@@ -296,11 +356,31 @@ with tab2:
                 color="Safety Tier",
                 color_discrete_map=color_map,
             )
-            fig_donut.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=320)
+            fig_donut.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=300)
             st.plotly_chart(fig_donut, use_container_width=True)
 
-        # Chart 2: District-wise Seat Availability
+        # Chart 2: Clinical vs Non-Clinical Donut Chart
         with chart_col2:
+            st.subheader("🩺 Branch Classification")
+            branch_counts = results_df["BRANCH_TYPE"].value_counts().reset_index()
+            branch_counts.columns = ["Classification", "Seats Count"]
+
+            fig_branch = px.pie(
+                branch_counts,
+                values="Seats Count",
+                names="Classification",
+                hole=0.45,
+                color="Classification",
+                color_discrete_map={
+                    "Clinical": "#3B82F6",
+                    "Non-Clinical": "#A855F7",
+                },
+            )
+            fig_branch.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=300)
+            st.plotly_chart(fig_branch, use_container_width=True)
+
+        # Chart 3: District-wise Seat Availability
+        with chart_col3:
             st.subheader("🗺️ Seats by District")
             district_counts = (
                 results_df["DISTRICT"]
@@ -321,7 +401,7 @@ with tab2:
             fig_dist.update_layout(
                 yaxis=dict(autorange="reversed"),
                 margin=dict(t=20, b=20, l=20, r=20),
-                height=320,
+                height=300,
             )
             st.plotly_chart(fig_dist, use_container_width=True)
 
