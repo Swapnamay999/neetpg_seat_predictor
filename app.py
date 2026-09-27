@@ -181,11 +181,12 @@ st.markdown(
 )
 
 # Map branch classification parameter
-branch_param = None
-if "Clinical Only" in branch_type_selection:
+if branch_type_selection == "Clinical Only":
     branch_param = "Clinical"
-elif "Non-Clinical Only" in branch_type_selection:
+elif branch_type_selection == "Non-Clinical Only":
     branch_param = "Non-Clinical"
+else:
+    branch_param = None
 
 # Run Inference
 sort_by_param = "cutoff" if "Competitive" in sort_order else "confidence"
@@ -238,11 +239,10 @@ with tab1:
         # Instant Column-Level Quick Filters
         with st.container(border=True):
             st.markdown("##### 🔎 Column-Level Quick Filters")
-            col_f1, col_f2, = st.columns([1,1])
+            col_f1, col_f2 = st.columns(2)
 
             avail_colleges = sorted(results_df["INSTITUTE"].unique())
             avail_courses = sorted(results_df["COURSE"].unique())
-            avail_branch_types = ["All Types"] + sorted(results_df["BRANCH_TYPE"].unique().tolist())
 
             with col_f1:
                 selected_colleges = st.multiselect(

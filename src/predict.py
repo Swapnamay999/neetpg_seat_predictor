@@ -237,7 +237,9 @@ class SeatPredictor:
         # Apply branch_type filter (Clinical / Non-Clinical)
         if branch_type and not results_df.empty:
             clean_bt = branch_type.strip().lower()
-            if "non" in clean_bt:
+            if "all" in clean_bt:
+                pass
+            elif "non" in clean_bt:
                 results_df = results_df[results_df["BRANCH_TYPE"] == "Non-Clinical"]
             elif "clin" in clean_bt:
                 results_df = results_df[results_df["BRANCH_TYPE"] == "Clinical"]
@@ -311,6 +313,13 @@ def main():
         help="Filter by district (e.g. Kolkata, Darjeeling, Bankura, Burdwan)",
     )
     parser.add_argument(
+        "--branch-type",
+        type=str,
+        default=None,
+        choices=["Clinical", "Non-Clinical"],
+        help="Filter by branch classification ('Clinical' or 'Non-Clinical')",
+    )
+    parser.add_argument(
         "--sort-by",
         type=str,
         default="cutoff",
@@ -329,6 +338,7 @@ def main():
         round_no=args.round,
         min_confidence=args.min_confidence,
         district=args.district,
+        branch_type=args.branch_type,
         sort_by=args.sort_by,
         top_n=args.top,
     )
@@ -337,6 +347,8 @@ def main():
     print(f" NEET PG SEAT PREDICTIONS (AIR: {args.air:,} | Category: {args.category} | Quota: {args.quota} | Round: {args.round})")
     if args.district:
         print(f" District Filter: {args.district}")
+    if args.branch_type:
+        print(f" Branch Type: {args.branch_type}")
     print(f" Showing seats with Confidence >= {args.min_confidence * 100:.0f}%")
     print("=" * 80)
 
