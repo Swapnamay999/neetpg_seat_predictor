@@ -1,17 +1,18 @@
-from pandas.core.frame import DataFrame
-from pathlib import Path
 import re
 import subprocess
+import sys
+from pathlib import Path
+
+from pandas.core.frame import DataFrame
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 
 import pandas as pd
 import tabula
 from tqdm import tqdm
 
-DOCS_PATH: list[Path] = list(
-    (Path(__file__).resolve().parent.parent / "docs").glob("*.pdf")
-)
-
-DATA_PATH = Path(__file__).resolve().parent.parent/"data"
+from config import DATA_PATH, DOCS_PATH
 
 
 def extract_pdf_title(pdf_path: Path) -> str:

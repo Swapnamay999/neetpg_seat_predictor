@@ -1,0 +1,14 @@
+{
+  "train_samples_2024": 2087,
+  "test_samples_2025": 2136,
+  "temporal_r2": 0.7389,
+  "temporal_adj_r2": 0.7383,
+  "temporal_rmse": 30923.8,
+  "temporal_mae": 20311.12,
+  "cv_folds": 5,
+  "cv_r2_mean": 0.8399,
+  "cv_r2_std": 0.0044,
+  "cv_adj_r2_mean": 0.8389,
+  "cv_rmse_mean": 22329.57,
+  "cv_mae_mean": 14596.89
+}
