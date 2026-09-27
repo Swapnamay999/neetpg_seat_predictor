@@ -10,6 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(BASE_DIR))
 
 from config import MODEL_PATH
+from src.districts import get_district, ALL_DISTRICTS
 
 # Standard quota aliases
 QUOTA_ALIASES = {
@@ -120,6 +121,7 @@ class SeatPredictor:
         allotted_quota: str,
         round_no: int = 1,
         min_confidence: float = 0.50,
+        district: str | None = None,
         sort_by: str = "cutoff",
         top_n: int | None = None,
     ) -> pd.DataFrame:
@@ -132,6 +134,7 @@ class SeatPredictor:
             allotted_quota: Open Quota, In-Service, Private Management Quota, NRI Quota.
             round_no: Counselling Round (1, 2, or 3).
             min_confidence: Minimum probability threshold (e.g. 0.50 for 50%).
+            district: Optional district filter (e.g. 'Kolkata', 'Darjeeling', 'Burdwan').
             sort_by: 'cutoff' (ranks most competitive seats first) or 'confidence' (safest first).
             top_n: Limit number of returned rows.
         """
@@ -183,6 +186,7 @@ class SeatPredictor:
 
         results_df = pd.DataFrame({
             "INSTITUTE": matching_seats["INSTITUTE"].values,
+            "DISTRICT": [get_district(inst) for inst in matching_seats["INSTITUTE"].values],
             "COURSE": matching_seats["COURSE"].values,
             "CONFIDENCE (%)": confidences,
             "STATUS": [get_safety_badge(c) for c in confidences],
@@ -192,6 +196,12 @@ class SeatPredictor:
             "HIST_AVG_RANK": np.round(matching_seats["HISTORICAL_AVG_RANK"].values).astype(int),
             "HIST_TOTAL_SEATS": matching_seats["TOTAL_SEATS_ALLOTTED"].values,
         })
+
+        # Apply district filter if requested
+        if district and not results_df.empty:
+            results_df = results_df[
+                results_df["DISTRICT"].str.contains(district.strip(), case=False, na=False)
+            ]
 
         # Drop duplicate college+branch offerings, keeping highest confidence
         results_df = results_df.sort_values(by="CONFIDENCE (%)", ascending=False)
@@ -244,6 +254,12 @@ def main():
         help="Minimum confidence threshold (e.g. 0.50 for >= 50%%)",
     )
     parser.add_argument(
+        "--district",
+        type=str,
+        default=None,
+        help="Filter by district (e.g. Kolkata, Darjeeling, Bankura, Burdwan)",
+    )
+    parser.add_argument(
         "--sort-by",
         type=str,
         default="cutoff",
@@ -261,12 +277,15 @@ def main():
         allotted_quota=args.quota,
         round_no=args.round,
         min_confidence=args.min_confidence,
+        district=args.district,
         sort_by=args.sort_by,
         top_n=args.top,
     )
 
     print("\n" + "=" * 80)
     print(f" NEET PG SEAT PREDICTIONS (AIR: {args.air:,} | Category: {args.category} | Quota: {args.quota} | Round: {args.round})")
+    if args.district:
+        print(f" District Filter: {args.district}")
     print(f" Showing seats with Confidence >= {args.min_confidence * 100:.0f}%")
     print("=" * 80)
 
@@ -276,6 +295,7 @@ def main():
         print(f"Found {len(results)} matching seat options:\n")
         display_cols = [
             "INSTITUTE",
+            "DISTRICT",
             "COURSE",
             "CONFIDENCE (%)",
             "STATUS",

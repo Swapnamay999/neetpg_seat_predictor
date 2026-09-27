@@ -16,6 +16,7 @@ sys.path.append(str(BASE_DIR))
 
 from config import MODEL_PATH
 from src.predict import SeatPredictor, CATEGORY_ALIASES, QUOTA_ALIASES
+from src.districts import ALL_DISTRICTS, INSTITUTE_TO_DISTRICT, get_district
 
 app = typer.Typer(
     name="neetpg-predict",
@@ -91,6 +92,12 @@ def predict(
         "-m",
         help="Minimum confidence threshold percentage (e.g. 50.0 for >= 50%)",
     ),
+    district: Optional[str] = typer.Option(
+        None,
+        "--district",
+        "-d",
+        help="Filter results by district (e.g. 'Kolkata', 'Darjeeling', 'Burdwan', 'Nadia')",
+    ),
     sort_by: str = typer.Option(
         "cutoff",
         "--sort-by",
@@ -150,6 +157,11 @@ def predict(
         round_no = typer.prompt("👉 Select Counselling Round (1, 2, 3)", default=round_no, type=int)
         min_confidence = typer.prompt("👉 Minimum Confidence %", default=min_confidence, type=float)
 
+        rprint(f"[dim]Common districts: Kolkata, North 24 Parganas, Paschim Bardhaman, Darjeeling (or Enter for all)[/dim]")
+        dist_input = typer.prompt("👉 Filter by District (optional, press Enter to skip)", default="")
+        if dist_input.strip():
+            district = dist_input.strip()
+
     # Convert percentage to decimal if > 1.0
     conf_decimal = min_confidence / 100.0 if min_confidence > 1.0 else min_confidence
 
@@ -162,6 +174,7 @@ def predict(
                 allotted_quota=quota,
                 round_no=round_no,
                 min_confidence=conf_decimal,
+                district=district,
                 sort_by=sort_by,
                 top_n=None,  # Filter before truncating
             )
@@ -180,14 +193,18 @@ def predict(
 
     # Header Card
     console.print()
-    header_text = (
-        f"[bold]AIR:[/bold] [yellow]{air:,}[/yellow]   "
-        f"[bold]Category:[/bold] [cyan]{category}[/cyan]   "
-        f"[bold]Quota:[/bold] [green]{quota}[/green]   "
-        f"[bold]Round:[/bold] [magenta]{round_no}[/magenta]   "
-        f"[bold]Threshold:[/bold] [yellow]≥ {min_confidence:.0f}%[/yellow]   "
-        f"[bold]Sort:[/bold] [cyan]{sort_by.capitalize()}[/cyan]"
-    )
+    header_parts = [
+        f"[bold]AIR:[/bold] [yellow]{air:,}[/yellow]",
+        f"[bold]Category:[/bold] [cyan]{category}[/cyan]",
+        f"[bold]Quota:[/bold] [green]{quota}[/green]",
+        f"[bold]Round:[/bold] [magenta]{round_no}[/magenta]",
+        f"[bold]Threshold:[/bold] [yellow]≥ {min_confidence:.0f}%[/yellow]",
+    ]
+    if district:
+        header_parts.append(f"[bold]District:[/bold] [yellow]{district}[/yellow]")
+    header_parts.append(f"[bold]Sort:[/bold] [cyan]{sort_by.capitalize()}[/cyan]")
+
+    header_text = "   ".join(header_parts)
     console.print(Panel(header_text, title="🎯 Prediction Parameters", border_style="blue"))
 
     if df_top.empty:
@@ -197,7 +214,7 @@ def predict(
                 "[dim]💡 Suggestions:\n"
                 "  • Try lowering the threshold: [cyan]--min-confidence 30[/cyan]\n"
                 "  • Check a later round: [cyan]--round 3[/cyan]\n"
-                "  • Remove course/college filters[/dim]",
+                "  • Remove district or course filters[/dim]",
                 title="Result",
                 border_style="yellow",
             )
@@ -207,10 +224,10 @@ def predict(
     # Build Tabulate Data
     table_data = []
     for idx, row in df_top.iterrows():
-        status_colored = format_status(row["STATUS"])
         table_data.append([
             len(table_data) + 1,
             row["INSTITUTE"],
+            row["DISTRICT"],
             row["COURSE"],
             f"{row['CONFIDENCE (%)']:.1f}%",
             row["STATUS"],
@@ -221,6 +238,7 @@ def predict(
     headers = [
         "#",
         "Institute",
+        "District",
         "Course / Speciality",
         "Confidence",
         "Safety Status",
@@ -233,7 +251,7 @@ def predict(
         table_data,
         headers=headers,
         tablefmt="rounded_outline",
-        colalign=("center", "left", "left", "right", "left", "right", "right"),
+        colalign=("center", "left", "left", "left", "right", "left", "right", "right"),
     )
     console.print(rendered_table)
 
@@ -352,5 +370,29 @@ def show_catalog():
     console.print(Panel(summary_panel, title="🏛️ WB NEET PG Seat Catalog Summary", border_style="cyan"))
 
 
+@app.command(name="districts", help="🗺️ List all West Bengal districts and their medical institutions.")
+def list_districts():
+    """
+    List all West Bengal districts and the medical colleges in each.
+    """
+    from collections import defaultdict
+    by_district = defaultdict(list)
+    for inst, dist in sorted(INSTITUTE_TO_DISTRICT.items()):
+        by_district[dist].append(inst)
+
+    table = Table(title="🗺️ West Bengal Medical Institutions by District", border_style="cyan")
+    table.add_column("District", style="bold cyan", no_wrap=True)
+    table.add_column("Count", style="yellow", justify="center", no_wrap=True)
+    table.add_column("Medical Colleges & Hospitals", style="white")
+
+    for dist in sorted(by_district.keys()):
+        inst_list = "\n".join(f"• {inst}" for inst in sorted(by_district[dist]))
+        table.add_row(dist, str(len(by_district[dist])), inst_list)
+        table.add_section()
+
+    console.print(table)
+
+
 if __name__ == "__main__":
     app()
+
