@@ -184,7 +184,7 @@ st.markdown(
 branch_param = None
 if "Clinical Only" in branch_type_selection:
     branch_param = "Clinical"
-elif "Non-Clinical" in branch_type_selection:
+elif "Non-Clinical Only" in branch_type_selection:
     branch_param = "Non-Clinical"
 
 # Run Inference
