@@ -238,7 +238,7 @@ with tab1:
         # Instant Column-Level Quick Filters
         with st.container(border=True):
             st.markdown("##### 🔎 Column-Level Quick Filters")
-            col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 1])
+            col_f1, col_f2, = st.columns([1,1])
 
             avail_colleges = sorted(results_df["INSTITUTE"].unique())
             avail_courses = sorted(results_df["COURSE"].unique())
@@ -260,13 +260,6 @@ with tab1:
                     placeholder="All Subjects in View",
                     help="Filter rows by specific subjects.",
                 )
-            with col_f3:
-                selected_bt = st.selectbox(
-                    "Branch Classification",
-                    options=avail_branch_types,
-                    index=0,
-                    help="Toggle between Clinical and Non-Clinical specialities.",
-                )
 
         # Apply Column-Level Filters
         filtered_view = results_df.copy()
@@ -274,8 +267,6 @@ with tab1:
             filtered_view = filtered_view[filtered_view["INSTITUTE"].isin(selected_colleges)]
         if selected_subjects:
             filtered_view = filtered_view[filtered_view["COURSE"].isin(selected_subjects)]
-        if selected_bt != "All Types":
-            filtered_view = filtered_view[filtered_view["BRANCH_TYPE"] == selected_bt]
 
         st.caption(f"Displaying top {min(top_limit, len(filtered_view))} of {len(filtered_view)} filtered seats.")
 
